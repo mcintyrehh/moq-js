@@ -10,6 +10,7 @@ export enum Version {
 	DRAFT_03 = 0xff000003,
 	DRAFT_04 = 0xff000004,
 	DRAFT_05 = 0xff000005,
+	DRAFT_06 = 0xff000006,
 	KIXEL_00 = 0xbad00,
 	KIXEL_01 = 0xbad01,
 }
@@ -52,17 +53,21 @@ export class Decoder {
 	async client(): Promise<Client> {
 		const type = await this.r.u53()
 		if (type !== 0x40) throw new Error(`client SETUP type must be 0x40, got ${type}`)
+		console.log("setup.ts: received setup message with type: ", type)
 
 		const count = await this.r.u53()
+		console.log("setup.ts: received setup message with supported version count: ", count)
 
 		const versions = []
 		for (let i = 0; i < count; i++) {
 			const version = await this.r.u53()
 			versions.push(version)
 		}
+		console.log("setup.ts: received setup message with supported versions: ", versions)
 
 		const params = await this.parameters()
 		const role = this.role(params?.get(0n))
+		console.log("setup.ts: received setup message with role: ", role)
 
 		return {
 			versions,
@@ -131,6 +136,9 @@ export class Encoder {
 
 	async client(c: Client) {
 		await this.w.u53(0x40)
+		// literally just making up a number to see if this works
+		// goal here is to add message length as added in DRAFT_06
+		await this.w.u53(256)
 		await this.w.u53(c.versions.length)
 		for (const v of c.versions) {
 			await this.w.u53(v)

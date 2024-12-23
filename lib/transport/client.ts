@@ -46,14 +46,19 @@ export class Client {
 
 		const setup = new Setup.Stream(reader, writer)
 
+		const setupPayload = {
+			versions: [Setup.Version.DRAFT_06],
+			role: this.config.role,
+		}
+		console.log("client.ts: sending setup message: ", setupPayload)
 		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.DRAFT_05], role: this.config.role })
+		await setup.send.client(setupPayload)
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
 		const server = await setup.recv.server()
 
-		if (server.version != Setup.Version.DRAFT_05) {
+		if (server.version != Setup.Version.DRAFT_06) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 
