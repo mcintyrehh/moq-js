@@ -80,6 +80,9 @@ export class Decoder {
 		const type = await this.r.u53()
 		if (type !== 0x41) throw new Error(`server SETUP type must be 0x41, got ${type}`)
 
+		const messageLength = await this.r.u53()
+		// @todo: verify message length
+
 		const version = await this.r.u53()
 		const params = await this.parameters()
 
@@ -139,12 +142,10 @@ export class Encoder {
 		const msg: Uint8Array[] = []
 
 		const versionLength = setVint53(new Uint8Array(8), c.versions.length)
-		console.log("version length: ", versionLength)
 		msg.push(versionLength)
 		len += versionLength.length
 
 		for (const v of c.versions) {
-			console.log("pushing version: ", v)
 			const version = setVint53(new Uint8Array(8), v)
 			msg.push(version)
 			len += version.length
@@ -158,6 +159,7 @@ export class Encoder {
 
 		const messageType = setVint53(new Uint8Array(8), 0x40)
 		const messageLength = setVint53(new Uint8Array(8), len)
+		console.log("setup.ts: sending total message length: ", len)
 		for (const elem of [messageType, messageLength, ...msg]) {
 			await this.w.write(elem)
 		}
@@ -186,7 +188,6 @@ export class Encoder {
 	private buildParameters(p: Parameters | undefined): { paramData: Uint8Array[]; totalBytes: number } {
 		if (!p) return { paramData: [setUint8(new Uint8Array(8), 0)], totalBytes: 0 }
 		const paramBytes = [setVint53(new Uint8Array(8), p.size)]
-		console.log(paramBytes)
 		for (const [id, value] of p) {
 			const idBytes = setVint62(new Uint8Array(8), id)
 			const sizeBytes = setVint53(new Uint8Array(8), value.length)
