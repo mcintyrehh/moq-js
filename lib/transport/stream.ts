@@ -208,7 +208,7 @@ export class Writer {
 	}
 }
 
-function setUint8(dst: Uint8Array, v: number): Uint8Array {
+export function setUint8(dst: Uint8Array, v: number): Uint8Array {
 	dst[0] = v
 	return dst.slice(0, 1)
 }
@@ -234,7 +234,7 @@ function setUint32(dst: Uint8Array, v: number): Uint8Array {
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-function setVint53(dst: Uint8Array, v: number): Uint8Array {
+export function setVint53(dst: Uint8Array, v: number): Uint8Array {
 	if (v <= MAX_U6) {
 		return setUint8(dst, v)
 	} else if (v <= MAX_U14) {
@@ -248,7 +248,7 @@ function setVint53(dst: Uint8Array, v: number): Uint8Array {
 	}
 }
 
-function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
+export function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
 	if (v < MAX_U6) {
 		return setUint8(dst, Number(v))
 	} else if (v < MAX_U14) {

@@ -1,4 +1,4 @@
-import { Reader, Writer } from "./stream"
+import { Reader, Writer, setUint8, setVint53, setVint62 } from "./stream"
 
 export type Message = Client | Server
 export type Role = "publisher" | "subscriber" | "both"
@@ -135,19 +135,32 @@ export class Encoder {
 	}
 
 	async client(c: Client) {
-		await this.w.u53(0x40)
-		// literally just making up a number to see if this works
-		// goal here is to add message length as added in DRAFT_06
-		await this.w.u53(256)
-		await this.w.u53(c.versions.length)
+		let len = 0
+		const msg: Uint8Array[] = []
+
+		const versionLength = setVint53(new Uint8Array(8), c.versions.length)
+		console.log("version length: ", versionLength)
+		msg.push(versionLength)
+		len += versionLength.length
+
 		for (const v of c.versions) {
-			await this.w.u53(v)
+			console.log("pushing version: ", v)
+			const version = setVint53(new Uint8Array(8), v)
+			msg.push(version)
+			len += version.length
 		}
 
-		// I hate it
 		const params = c.params ?? new Map()
 		params.set(0n, new Uint8Array([c.role == "publisher" ? 1 : c.role == "subscriber" ? 2 : 3]))
-		await this.parameters(params)
+		const { paramData, totalBytes } = this.buildParameters(params)
+		msg.push(...paramData)
+		len += totalBytes
+
+		const messageType = setVint53(new Uint8Array(8), 0x40)
+		const messageLength = setVint53(new Uint8Array(8), len)
+		for (const elem of [messageType, messageLength, ...msg]) {
+			await this.w.write(elem)
+		}
 	}
 
 	async server(s: Server) {
@@ -168,5 +181,17 @@ export class Encoder {
 			await this.w.u53(value.length)
 			await this.w.write(value)
 		}
+	}
+
+	private buildParameters(p: Parameters | undefined): { paramData: Uint8Array[]; totalBytes: number } {
+		if (!p) return { paramData: [setUint8(new Uint8Array(8), 0)], totalBytes: 0 }
+		const paramBytes = [setVint53(new Uint8Array(8), p.size)]
+		console.log(paramBytes)
+		for (const [id, value] of p) {
+			const idBytes = setVint62(new Uint8Array(8), id)
+			const sizeBytes = setVint53(new Uint8Array(8), value.length)
+			paramBytes.push(idBytes, sizeBytes, value)
+		}
+		return { paramData: paramBytes, totalBytes: paramBytes.reduce((acc, curr) => acc + curr.length, 0) }
 	}
 }
