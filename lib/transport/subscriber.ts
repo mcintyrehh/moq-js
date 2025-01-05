@@ -40,6 +40,10 @@ export class Subscriber {
 			await this.recvSubscribeError(msg)
 		} else if (msg.kind == Control.Msg.SubscribeDone) {
 			await this.recvSubscribeDone(msg)
+		} else if (msg.kind == Control.Msg.SubscribeNamespaceOk) {
+			this.recvSubscribeNamespaceOk(msg)
+		} else if (msg.kind == Control.Msg.SubscribeNamespaceError) {
+			this.recvSubscribeNamespaceError(msg)
 		} else {
 			throw new Error(`unknown control message`) // impossible
 		}
@@ -129,6 +133,14 @@ export class Subscriber {
 		}
 
 		await subscribe.onError(msg.code, msg.reason)
+	}
+
+	recvSubscribeNamespaceOk(_msg: Control.SubscribeNamespaceOk) {
+		throw new Error(`TODO SubscribeNamespaceOk`)
+	}
+
+	recvSubscribeNamespaceError(_msg: Control.SubscribeNamespaceError) {
+		throw new Error(`TODO SubscribeNamespaceError`)
 	}
 
 	async recvObject(reader: TrackReader | SubgroupReader) {

@@ -16,6 +16,9 @@ export class Publisher {
 	#subscribe = new Map<bigint, SubscribeRecv>()
 	#subscribeQueue = new Queue<SubscribeRecv>(Number.MAX_SAFE_INTEGER) // Unbounded queue in case there's no receiver
 
+	// Their subscribed namespaces.
+	#subscribeNamespace = new Map<string, bigint>()
+
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
 		this.#objects = objects
@@ -52,6 +55,10 @@ export class Publisher {
 			this.recvAnnounceOk(msg)
 		} else if (msg.kind == Control.Msg.AnnounceError) {
 			this.recvAnnounceError(msg)
+		} else if (msg.kind == Control.Msg.SubscribeNamespace) {
+			this.recvSubscribeNamespace(msg)
+		} else if (msg.kind == Control.Msg.UnsubscribeNamespace) {
+			this.recvUnsubscribeNamespace(msg)
 		} else {
 			throw new Error(`unknown control message`) // impossible
 		}
@@ -95,7 +102,15 @@ export class Publisher {
 	}
 
 	recvUnsubscribe(_msg: Control.Unsubscribe) {
-		throw new Error("TODO unsubscribe")
+		throw new Error("TODO Unsubscribe")
+	}
+
+	recvSubscribeNamespace(_msg: Control.SubscribeNamespace) {
+		throw new Error("TODO SubscribeNamespace")
+	}
+
+	recvUnsubscribeNamespace(_msg: Control.UnsubscribeNamespace) {
+		throw new Error("TODO UnsubscribeNamespace")
 	}
 }
 

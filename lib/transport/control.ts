@@ -3,16 +3,33 @@ import { Reader, Writer } from "./stream"
 export type Message = Subscriber | Publisher
 
 // Sent by subscriber
-export type Subscriber = Subscribe | Unsubscribe | AnnounceOk | AnnounceError
+export type Subscriber =
+	| Subscribe
+	| Unsubscribe
+	| AnnounceOk
+	| AnnounceError
+	| SubscribeNamespace
+	| UnsubscribeNamespace
 
 export function isSubscriber(m: Message): m is Subscriber {
 	return (
-		m.kind == Msg.Subscribe || m.kind == Msg.Unsubscribe || m.kind == Msg.AnnounceOk || m.kind == Msg.AnnounceError
+		m.kind == Msg.Subscribe ||
+		m.kind == Msg.Unsubscribe ||
+		m.kind == Msg.AnnounceOk ||
+		m.kind == Msg.AnnounceError ||
+		m.kind == Msg.SubscribeNamespace
 	)
 }
 
 // Sent by publisher
-export type Publisher = SubscribeOk | SubscribeError | SubscribeDone | Announce | Unannounce
+export type Publisher =
+	| SubscribeOk
+	| SubscribeError
+	| SubscribeDone
+	| Announce
+	| Unannounce
+	| SubscribeNamespaceOk
+	| SubscribeNamespaceError
 
 export function isPublisher(m: Message): m is Publisher {
 	return (
@@ -39,6 +56,10 @@ export enum Msg {
 	AnnounceError = "announce_error",
 	Unannounce = "unannounce",
 	GoAway = "go_away",
+	SubscribeNamespace = "subscribe_namespace",
+	SubscribeNamespaceOk = "subscribe_namespace_ok",
+	SubscribeNamespaceError = "subscribe_namespace_error",
+	UnsubscribeNamespace = "unsubscribe_namespace",
 }
 
 enum Id {
@@ -56,6 +77,10 @@ enum Id {
 	AnnounceError = 0x8,
 	Unannounce = 0x9,
 	GoAway = 0x10,
+	SubscribeNamespace = 0x11,
+	SubscribeNamespaceOk = 0x12,
+	SubscribeNamespaceError = 0x13,
+	UnsubscribeNamespace = 0x14,
 }
 
 export interface Subscribe {
@@ -158,6 +183,29 @@ export interface Unannounce {
 	namespace: string[]
 }
 
+export interface SubscribeNamespace {
+	kind: Msg.SubscribeNamespace
+	namespace: string[]
+	params?: Parameters
+}
+
+export interface SubscribeNamespaceOk {
+	kind: Msg.SubscribeNamespaceOk
+	namespace: string[]
+}
+
+export interface SubscribeNamespaceError {
+	kind: Msg.SubscribeNamespaceError
+	namespace: string[]
+	code: bigint
+	reason: string
+}
+
+export interface UnsubscribeNamespace {
+	kind: Msg.UnsubscribeNamespace
+	namespace: string[]
+}
+
 export class Stream {
 	private decoder: Decoder
 	private encoder: Encoder
@@ -244,6 +292,14 @@ export class Decoder {
 				return Msg.Unannounce
 			case Id.GoAway:
 				return Msg.GoAway
+			case Id.SubscribeNamespace:
+				return Msg.SubscribeNamespace
+			case Id.SubscribeNamespaceOk:
+				return Msg.SubscribeNamespaceOk
+			case Id.SubscribeNamespaceError:
+				return Msg.SubscribeNamespaceError
+			case Id.UnsubscribeNamespace:
+				return Msg.UnsubscribeNamespace
 		}
 
 		throw new Error(`unknown control message type: ${t}`)
@@ -272,6 +328,14 @@ export class Decoder {
 				return this.announce_error()
 			case Msg.GoAway:
 				throw new Error("TODO: implement go away")
+			case Msg.SubscribeNamespace:
+				return this.subscribe_namespace()
+			case Msg.SubscribeNamespaceOk:
+				return this.subscribe_namespace_ok()
+			case Msg.SubscribeNamespaceError:
+				return this.subscribe_namespace_error()
+			case Msg.UnsubscribeNamespace:
+				return this.unsubscribe_namespace()
 		}
 	}
 
@@ -450,6 +514,37 @@ export class Decoder {
 			namespace: await this.r.tuple(),
 		}
 	}
+
+	private async subscribe_namespace(): Promise<SubscribeNamespace> {
+		return {
+			kind: Msg.SubscribeNamespace,
+			namespace: await this.r.tuple(),
+			params: await this.parameters(),
+		}
+	}
+
+	private async subscribe_namespace_ok(): Promise<SubscribeNamespaceOk> {
+		return {
+			kind: Msg.SubscribeNamespaceOk,
+			namespace: await this.r.tuple(),
+		}
+	}
+
+	private async subscribe_namespace_error(): Promise<SubscribeNamespaceError> {
+		return {
+			kind: Msg.SubscribeNamespaceError,
+			namespace: await this.r.tuple(),
+			code: await this.r.u62(),
+			reason: await this.r.string(),
+		}
+	}
+
+	private async unsubscribe_namespace(): Promise<UnsubscribeNamespace> {
+		return {
+			kind: Msg.UnsubscribeNamespace,
+			namespace: await this.r.tuple(),
+		}
+	}
 }
 
 export class Encoder {
@@ -479,6 +574,14 @@ export class Encoder {
 				return this.announce_error(m)
 			case Msg.Unannounce:
 				return this.unannounce(m)
+			case Msg.SubscribeNamespace:
+				return this.subscribe_namespace(m)
+			case Msg.SubscribeNamespaceOk:
+				return this.subscribe_namespace_ok(m)
+			case Msg.SubscribeNamespaceError:
+				return this.subscribe_namespace_error(m)
+			case Msg.UnsubscribeNamespace:
+				return this.unsubscribe_namespace(m)
 		}
 	}
 
@@ -627,6 +730,65 @@ export class Encoder {
 		const msgData = this.w.concatBuffer([this.w.encodeTuple(buffer, a.namespace)])
 
 		const messageType = this.w.setVint53(buffer, Id.Unannounce)
+		const messageLength = this.w.setVint53(buffer, msgData.length)
+
+		for (const elem of [messageType, messageLength, msgData]) {
+			await this.w.write(elem)
+		}
+	}
+
+	async subscribe_namespace(s: SubscribeNamespace) {
+		const buffer = new Uint8Array(8)
+
+		const msgData = this.w.concatBuffer([
+			this.w.encodeTuple(buffer, s.namespace),
+			this.encodeParameters(buffer, s.params),
+		])
+
+		const messageType = this.w.setVint53(buffer, Id.SubscribeNamespace)
+		const messageLength = this.w.setVint53(buffer, msgData.length)
+
+		for (const elem of [messageType, messageLength, msgData]) {
+			await this.w.write(elem)
+		}
+	}
+
+	async subscribe_namespace_ok(s: SubscribeNamespaceOk) {
+		const buffer = new Uint8Array(8)
+
+		const msgData = this.w.encodeTuple(buffer, s.namespace)
+
+		const messageType = this.w.setVint53(buffer, Id.SubscribeNamespaceOk)
+		const messageLength = this.w.setVint53(buffer, msgData.length)
+
+		for (const elem of [messageType, messageLength, msgData]) {
+			await this.w.write(elem)
+		}
+	}
+
+	async subscribe_namespace_error(s: SubscribeNamespaceError) {
+		const buffer = new Uint8Array(8)
+
+		const msgData = this.w.concatBuffer([
+			this.w.encodeTuple(buffer, s.namespace),
+			this.w.setVint62(buffer, s.code),
+			this.w.encodeString(buffer, s.reason),
+		])
+
+		const messageType = this.w.setVint53(buffer, Id.SubscribeNamespaceError)
+		const messageLength = this.w.setVint53(buffer, msgData.length)
+
+		for (const elem of [messageType, messageLength, msgData]) {
+			await this.w.write(elem)
+		}
+	}
+
+	async unsubscribe_namespace(s: UnsubscribeNamespace) {
+		const buffer = new Uint8Array(8)
+
+		const msgData = this.w.encodeTuple(buffer, s.namespace)
+
+		const messageType = this.w.setVint53(buffer, Id.UnsubscribeNamespace)
 		const messageLength = this.w.setVint53(buffer, msgData.length)
 
 		for (const elem of [messageType, messageLength, msgData]) {
