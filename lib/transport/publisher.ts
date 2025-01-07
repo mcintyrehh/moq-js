@@ -19,6 +19,9 @@ export class Publisher {
 	// Their subscribed namespaces.
 	#subscribeNamespace = new Map<string, bigint>()
 
+	// Maximum Subscription ID allowed.
+	#maxSubscribeId = Infinity
+
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
 		this.#objects = objects
@@ -82,6 +85,12 @@ export class Publisher {
 		}
 
 		announce.onError(msg.code, msg.reason)
+	}
+
+	checkSubscribeId(id: bigint) {
+		if (id > this.#maxSubscribeId) {
+			throw new Error(`subscribe id too large: ${id} > ${this.#maxSubscribeId} max subscribe id`)
+		}
 	}
 
 	async recvSubscribe(msg: Control.Subscribe) {

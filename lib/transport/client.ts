@@ -45,12 +45,21 @@ export class Client {
 		const reader = new Stream.Reader(new Uint8Array(), stream.readable)
 
 		const setup = new Setup.Stream(reader, writer)
+		console.log("client.ts connect() setup: role, versions: ", this.config.role, [Setup.Version.DRAFT_06])
 
-		// Send the setup message.
-		await setup.send.client({
+		const setupPayload: Setup.Client = {
 			versions: [Setup.Version.DRAFT_06],
 			role: this.config.role,
-		})
+		}
+
+		if (this.config.role === "publisher") {
+			// @todo: pass in maxSubscribeID so this is dynamic
+			console.log("~~~adding maxSubscribeID to setupPayload")
+			setupPayload.params = new Map<bigint, Uint8Array>().set(2n, new Uint8Array([2]))
+		}
+
+		// Send the setup message.
+		await setup.send.client(setupPayload)
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.

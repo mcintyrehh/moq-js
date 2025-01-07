@@ -69,6 +69,7 @@ export class Decoder {
 
 		const params = await this.parameters()
 		const role = this.role(params?.get(0n))
+		console.log("setup.ts Decoder.client() params:", params)
 
 		return {
 			versions,
@@ -88,7 +89,7 @@ export class Decoder {
 
 		const version = await this.r.u53()
 		const params = await this.parameters()
-
+		console.log("setup.ts Decoder.server() params:", params)
 		return {
 			version,
 			params,

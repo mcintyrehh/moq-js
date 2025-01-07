@@ -30,6 +30,7 @@ export type Publisher =
 	| Unannounce
 	| SubscribeNamespaceOk
 	| SubscribeNamespaceError
+	| MaxSubscribeId
 
 export function isPublisher(m: Message): m is Publisher {
 	return (
@@ -60,6 +61,7 @@ export enum Msg {
 	SubscribeNamespaceOk = "subscribe_namespace_ok",
 	SubscribeNamespaceError = "subscribe_namespace_error",
 	UnsubscribeNamespace = "unsubscribe_namespace",
+	MaxSubscribeId = "max_subscribe_id",
 }
 
 enum Id {
@@ -81,6 +83,7 @@ enum Id {
 	SubscribeNamespaceOk = 0x12,
 	SubscribeNamespaceError = 0x13,
 	UnsubscribeNamespace = 0x14,
+	MaxSubscribeId = 0x15,
 }
 
 export interface Subscribe {
@@ -206,6 +209,11 @@ export interface UnsubscribeNamespace {
 	namespace: string[]
 }
 
+export interface MaxSubscribeId {
+	kind: Msg.MaxSubscribeId
+	id: bigint
+}
+
 export class Stream {
 	private decoder: Decoder
 	private encoder: Encoder
@@ -300,6 +308,8 @@ export class Decoder {
 				return Msg.SubscribeNamespaceError
 			case Id.UnsubscribeNamespace:
 				return Msg.UnsubscribeNamespace
+			case Id.MaxSubscribeId:
+				return Msg.MaxSubscribeId
 		}
 
 		throw new Error(`unknown control message type: ${t}`)
@@ -336,6 +346,8 @@ export class Decoder {
 				return this.subscribe_namespace_error()
 			case Msg.UnsubscribeNamespace:
 				return this.unsubscribe_namespace()
+			case Msg.MaxSubscribeId:
+				return this.max_subscribe_id()
 		}
 	}
 
@@ -545,6 +557,13 @@ export class Decoder {
 			namespace: await this.r.tuple(),
 		}
 	}
+
+	private async max_subscribe_id(): Promise<MaxSubscribeId> {
+		return {
+			kind: Msg.MaxSubscribeId,
+			id: await this.r.u62(),
+		}
+	}
 }
 
 export class Encoder {
@@ -582,6 +601,8 @@ export class Encoder {
 				return this.subscribe_namespace_error(m)
 			case Msg.UnsubscribeNamespace:
 				return this.unsubscribe_namespace(m)
+			case Msg.MaxSubscribeId:
+				return this.max_subscribe_id(m)
 		}
 	}
 
@@ -789,6 +810,19 @@ export class Encoder {
 		const msgData = this.w.encodeTuple(buffer, s.namespace)
 
 		const messageType = this.w.setVint53(buffer, Id.UnsubscribeNamespace)
+		const messageLength = this.w.setVint53(buffer, msgData.length)
+
+		for (const elem of [messageType, messageLength, msgData]) {
+			await this.w.write(elem)
+		}
+	}
+
+	async max_subscribe_id(s: MaxSubscribeId) {
+		const buffer = new Uint8Array(8)
+
+		const msgData = this.w.setVint62(buffer, s.id)
+
+		const messageType = this.w.setVint53(buffer, Id.MaxSubscribeId)
 		const messageLength = this.w.setVint53(buffer, msgData.length)
 
 		for (const elem of [messageType, messageLength, msgData]) {
