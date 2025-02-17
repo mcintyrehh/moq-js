@@ -7,7 +7,7 @@
 		"samples"
 	],
 	"scripts": {
-		"dev:moq-player": "npm run dev --workspace=moq-player",
+		"dev:moq-player": "npm run dev --workspace=@moq-js/player",
 		"dev:simple-moq-web": "npm run dev --workspace=simple-moq-web",
 		"dev": "npm-run-all --parallel dev:moq-player dev:simple-moq-web",
 		"build": "npm run build --workspaces",
