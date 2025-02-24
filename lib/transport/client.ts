@@ -48,7 +48,7 @@ export class Client {
 
 		// Send the setup message.
 		await setup.send.client({
-			versions: [Setup.Version.DRAFT_06],
+			versions: [Setup.Version.DRAFT_07],
 			role: this.config.role,
 		})
 
